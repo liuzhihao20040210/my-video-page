@@ -22,146 +22,174 @@
         }
     </style>
 </head>
-<body>
-    <div class="video-container">
-        <video id="myVideo" muted playsinline loop>
-            <!-- 重要：请确保这里的视频文件名与实际完全一致 -->
+<body style="margin:0; padding:0; background:#000; height:100vh; overflow:hidden;">
+    <!-- 主容器，也是初始的播放触发区 -->
+    <div id="videoContainer" style="width:100%; height:100%; position:relative; background:#000;">
+        <!-- 视频元素 -->
+        <video
+            id="myVideo"
+            style="width:100%; height:100%; object-fit:contain; display:block;"
+            playsinline
+            webkit-playsinline
+            x5-playsinline
+            x5-video-player-type="h5"
+            preload="auto"
+            loop
+        >
+            <!-- 重要：请将 `src` 中的文件名改为你的实际视频文件名 -->
             <source src="my_video.mp4" type="video/mp4">
-            您的浏览器不支持 HTML5 视频。
         </video>
-        <!-- 自定义的极简控制条 -->
-        <div id="customControls" style="display: none; position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.7); color: white; box-sizing: border-box; padding: 10px;">
-            <div style="display: flex; align-items: center;">
-                <button id="playPauseBtn" style="background: none; border: none; color: white; font-size: 20px; margin-right: 10px;">▶️</button>
-                <span id="timeDisplay" style="margin-right: 10px;">0:00 / 0:00</span>
-                <input type="range" id="progressBar" value="0" style="flex-grow: 1; margin-right: 10px;">
-                <button id="muteBtn" style="background: none; border: none; color: white; font-size: 18px;">🔇</button>
+
+        <!-- 初始播放触发层（纯黑背景+白色播放图标） -->
+        <div id="initPlayOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:#000; display:flex; justify-content:center; align-items:center; z-index:2; cursor:pointer;">
+            <!-- 白色播放图标 -->
+            <div style="width: 72px; height: 72px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.5);">
+                <div style="width: 0; height: 0; border-top: 16px solid transparent; border-bottom: 16px solid transparent; border-left: 24px solid #fff; margin-left: 4px;"></div>
             </div>
         </div>
-        <!-- 初始引导播放按钮（保持原有逻辑） -->
-        <div id="playOverlay" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.7); color:white; padding:20px; border-radius:10px; cursor:pointer;">
-            点击播放视频
+
+        <!-- 自定义控制条（仅暂停/播放 + 静音） -->
+        <div id="customControls" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.75); border-radius: 40px; padding: 10px 20px; display:none; align-items:center; gap: 25px; z-index:1; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
+            <!-- 播放/暂停按钮 -->
+            <button id="playPauseBtn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center;">
+                    <!-- 暂停图标（两条竖线） -->
+                    <div id="pauseIcon" style="display: flex; gap: 4px;">
+                        <div style="width: 4px; height: 14px; background: #000;"></div>
+                        <div style="width: 4px; height: 14px; background: #000;"></div>
+                    </div>
+                    <!-- 播放图标（三角形），初始隐藏 -->
+                    <div id="playIcon" style="display: none; margin-left:2px;">
+                        <div style="width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 12px solid #000;"></div>
+                    </div>
+                </div>
+            </button>
+
+            <!-- 静音/取消静音按钮 -->
+            <button id="muteBtn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center;">
+                    <!-- 静音图标（喇叭+斜线），初始显示 -->
+                    <div id="muteIcon" style="position: relative;">
+                        <div style="width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 12px solid #000; margin-right: 2px;"></div>
+                        <div style="position: absolute; top: -1px; left: 7px; width: 12px; height: 2px; background: #000; transform: rotate(45deg); transform-origin: left center;"></div>
+                    </div>
+                    <!-- 有声图标（喇叭），初始隐藏 -->
+                    <div id="unmuteIcon" style="display: none;">
+                        <div style="width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 12px solid #000;"></div>
+                    </div>
+                </div>
+            </button>
         </div>
     </div>
 
     <script>
+        // 获取核心元素
         const video = document.getElementById('myVideo');
-        const playOverlay = document.getElementById('playOverlay');
+        const container = document.getElementById('videoContainer');
+        const initPlayOverlay = document.getElementById('initPlayOverlay');
         const customControls = document.getElementById('customControls');
         const playPauseBtn = document.getElementById('playPauseBtn');
-        const progressBar = document.getElementById('progressBar');
-        const timeDisplay = document.getElementById('timeDisplay');
         const muteBtn = document.getElementById('muteBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const muteIcon = document.getElementById('muteIcon');
+        const unmuteIcon = document.getElementById('unmuteIcon');
 
-        // ==================== 核心策略：禁用全屏与倍速 ====================
-        // 1. 阻止任何全屏请求（彻底禁用功能）
-        video.addEventListener('fullscreenchange', (e) => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            }
+        // ==================== 1. 锁定功能（禁止全屏/倍速） ====================
+        video.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) document.exitFullscreen();
         });
-        video.addEventListener('webkitfullscreenchange', (e) => {
-            if (document.webkitFullscreenElement) {
-                document.webkitExitFullscreen();
-            }
+        video.addEventListener('webkitfullscreenchange', () => {
+            if (document.webkitFullscreenElement) document.webkitExitFullscreen();
         });
-
-        // 2. 锁定播放速率，并防止通过任何方式修改
         video.playbackRate = 1.0;
         video.defaultPlaybackRate = 1.0;
         Object.defineProperty(video, 'playbackRate', { writable: false });
         Object.defineProperty(video, 'defaultPlaybackRate', { writable: false });
 
-        // ==================== 自动播放与引导按钮逻辑 ====================
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.log("自动播放被阻止，显示引导按钮。");
-                playOverlay.style.display = 'block';
-                customControls.style.display = 'none'; // 初始隐藏自定义控制条
-            });
-        } else {
-            // 如果自动播放成功，则显示自定义控制条
-            customControls.style.display = 'block';
-        }
-
-        playOverlay.addEventListener('click', function() {
-            video.play();
-            playOverlay.style.display = 'none';
-            customControls.style.display = 'block'; // 开始播放后显示自定义控制条
+        // ==================== 2. 播放触发逻辑 ====================
+        initPlayOverlay.addEventListener('click', function() {
+            // 隐藏初始播放层
+            initPlayOverlay.style.display = 'none';
+            // 显示自定义控制条
+            customControls.style.display = 'flex';
+            // 开始播放视频
+            video.play().catch(e => console.log("播放失败:", e));
         });
 
-        // ==================== 自定义控制条逻辑 ====================
-        // 播放/暂停
-        playPauseBtn.addEventListener('click', () => {
+        // ==================== 3. 播放/暂停控制 ====================
+        playPauseBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // 防止触发容器点击事件
             if (video.paused) {
                 video.play();
             } else {
                 video.pause();
             }
         });
+        // 根据播放状态切换图标
         video.addEventListener('play', () => {
-            playPauseBtn.textContent = '⏸️';
+            // 播放时显示暂停图标（两条竖线）
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'flex';
         });
         video.addEventListener('pause', () => {
-            playPauseBtn.textContent = '▶️';
+            // 暂停时显示播放图标（三角形）
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
         });
 
-        // 进度条
-        video.addEventListener('loadedmetadata', () => {
-            progressBar.max = Math.floor(video.duration);
-            updateTimeDisplay();
-        });
-        video.addEventListener('timeupdate', () => {
-            if (!progressBar.isDragging) {
-                progressBar.value = Math.floor(video.currentTime);
-                updateTimeDisplay();
+        // ==================== 4. 静音控制 ====================
+        muteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            video.muted = !video.muted;
+            // 切换静音/有声音图标
+            if (video.muted) {
+                muteIcon.style.display = 'block';
+                unmuteIcon.style.display = 'none';
+            } else {
+                muteIcon.style.display = 'none';
+                unmuteIcon.style.display = 'block';
             }
         });
-        progressBar.addEventListener('input', () => {
-            progressBar.isDragging = true;
-            video.currentTime = progressBar.value;
-            updateTimeDisplay();
-        });
-        progressBar.addEventListener('change', () => {
-            progressBar.isDragging = false;
-        });
 
-        // 静音/取消静音
-        muteBtn.addEventListener('click', () => {
-            video.muted = !video.muted;
-            muteBtn.textContent = video.muted ? '🔇' : '🔊';
-        });
-
-        // 时间显示格式化函数
-        function updateTimeDisplay() {
-            const current = formatTime(video.currentTime);
-            const total = formatTime(video.duration);
-            timeDisplay.textContent = `${current} / ${total}`;
-        }
-        function formatTime(seconds) {
-            const min = Math.floor(seconds / 60);
-            const sec = Math.floor(seconds % 60);
-            return `${min}:${sec.toString().padStart(2, '0')}`;
-        }
-
-        // ==================== 样式与交互增强 ====================
-        // 鼠标悬停在视频区域时，短暂显示控制条
-        let controlsTimeout;
-        video.addEventListener('mousemove', () => {
+        // ==================== 5. 控制条自动隐藏逻辑 ====================
+        let hideControlsTimer;
+        function showControlsTemporarily() {
             customControls.style.opacity = '1';
-            clearTimeout(controlsTimeout);
-            controlsTimeout = setTimeout(() => {
+            clearTimeout(hideControlsTimer);
+            hideControlsTimer = setTimeout(() => {
                 customControls.style.opacity = '0';
-            }, 2000);
-        });
-        // 初始设置控制条透明
-        customControls.style.transition = 'opacity 0.3s';
-        customControls.style.opacity = '0';
+            }, 2000); // 2秒后淡出
+        }
+        // 初始设置控制条可淡出
+        customControls.style.transition = 'opacity 0.5s ease';
+        // 鼠标移动或触摸时显示控制条
+        container.addEventListener('mousemove', showControlsTemporarily);
+        container.addEventListener('touchstart', showControlsTemporarily);
+        // 初始显示控制条，并开始计时隐藏
+        showControlsTemporarily();
     </script>
+
+    <!-- 强制隐藏所有原生控件的样式 -->
+    <style>
+        /* 隐藏所有默认视频控件 */
+        video::-webkit-media-controls { display:none !important; }
+        video::-webkit-media-controls-enclosure { display:none !important; }
+        video::-webkit-media-controls-panel { display:none !important; }
+        video::-webkit-media-controls-play-button { display:none !important; }
+        video::-webkit-media-controls-start-playback-button { display:none !important; }
+        video::-webkit-media-controls-timeline { display:none !important; }
+        video::-webkit-media-controls-current-time-display { display:none !important; }
+        video::-webkit-media-controls-time-remaining-display { display:none !important; }
+        video::-webkit-media-controls-mute-button { display:none !important; }
+        video::-webkit-media-controls-fullscreen-button { display:none !important; }
+        /* 全局移除按钮焦点轮廓 */
+        button:focus { outline: none; }
+    </style>
 </body>
 
 </html>
+
 
 
 
