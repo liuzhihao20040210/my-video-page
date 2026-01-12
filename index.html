@@ -24,23 +24,143 @@
 </head>
 <body>
     <div class="video-container">
-        <!-- ！！！重要：将下一行引号内的链接替换成你的实际视频链接！！！ -->
-        <video src="my_video.mp4" autoplay muted playsinline controls loop></video>
+        <video id="myVideo" muted playsinline loop>
+            <!-- 重要：请确保这里的视频文件名与实际完全一致 -->
+            <source src="my_video.mp4" type="video/mp4">
+            您的浏览器不支持 HTML5 视频。
+        </video>
+        <!-- 自定义的极简控制条 -->
+        <div id="customControls" style="display: none; position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.7); color: white; box-sizing: border-box; padding: 10px;">
+            <div style="display: flex; align-items: center;">
+                <button id="playPauseBtn" style="background: none; border: none; color: white; font-size: 20px; margin-right: 10px;">▶️</button>
+                <span id="timeDisplay" style="margin-right: 10px;">0:00 / 0:00</span>
+                <input type="range" id="progressBar" value="0" style="flex-grow: 1; margin-right: 10px;">
+                <button id="muteBtn" style="background: none; border: none; color: white; font-size: 18px;">🔇</button>
+            </div>
+        </div>
+        <!-- 初始引导播放按钮（保持原有逻辑） -->
+        <div id="playOverlay" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.7); color:white; padding:20px; border-radius:10px; cursor:pointer;">
+            点击播放视频
+        </div>
     </div>
-    <script>
-        // 尝试自动播放，并为点击全屏做准备
-        const video = document.querySelector('video');
-        video.play().catch(e => { /* 忽略自动播放被阻止的报错 */ });
 
-        // 点击视频区域切换全屏（提升体验）
-        video.addEventListener('click', function() {
-            if (!document.fullscreenElement) {
-                if (video.requestFullscreen) video.requestFullscreen();
-                else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+    <script>
+        const video = document.getElementById('myVideo');
+        const playOverlay = document.getElementById('playOverlay');
+        const customControls = document.getElementById('customControls');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const progressBar = document.getElementById('progressBar');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const muteBtn = document.getElementById('muteBtn');
+
+        // ==================== 核心策略：禁用全屏与倍速 ====================
+        // 1. 阻止任何全屏请求（彻底禁用功能）
+        video.addEventListener('fullscreenchange', (e) => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
             }
         });
+        video.addEventListener('webkitfullscreenchange', (e) => {
+            if (document.webkitFullscreenElement) {
+                document.webkitExitFullscreen();
+            }
+        });
+
+        // 2. 锁定播放速率，并防止通过任何方式修改
+        video.playbackRate = 1.0;
+        video.defaultPlaybackRate = 1.0;
+        Object.defineProperty(video, 'playbackRate', { writable: false });
+        Object.defineProperty(video, 'defaultPlaybackRate', { writable: false });
+
+        // ==================== 自动播放与引导按钮逻辑 ====================
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.log("自动播放被阻止，显示引导按钮。");
+                playOverlay.style.display = 'block';
+                customControls.style.display = 'none'; // 初始隐藏自定义控制条
+            });
+        } else {
+            // 如果自动播放成功，则显示自定义控制条
+            customControls.style.display = 'block';
+        }
+
+        playOverlay.addEventListener('click', function() {
+            video.play();
+            playOverlay.style.display = 'none';
+            customControls.style.display = 'block'; // 开始播放后显示自定义控制条
+        });
+
+        // ==================== 自定义控制条逻辑 ====================
+        // 播放/暂停
+        playPauseBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        });
+        video.addEventListener('play', () => {
+            playPauseBtn.textContent = '⏸️';
+        });
+        video.addEventListener('pause', () => {
+            playPauseBtn.textContent = '▶️';
+        });
+
+        // 进度条
+        video.addEventListener('loadedmetadata', () => {
+            progressBar.max = Math.floor(video.duration);
+            updateTimeDisplay();
+        });
+        video.addEventListener('timeupdate', () => {
+            if (!progressBar.isDragging) {
+                progressBar.value = Math.floor(video.currentTime);
+                updateTimeDisplay();
+            }
+        });
+        progressBar.addEventListener('input', () => {
+            progressBar.isDragging = true;
+            video.currentTime = progressBar.value;
+            updateTimeDisplay();
+        });
+        progressBar.addEventListener('change', () => {
+            progressBar.isDragging = false;
+        });
+
+        // 静音/取消静音
+        muteBtn.addEventListener('click', () => {
+            video.muted = !video.muted;
+            muteBtn.textContent = video.muted ? '🔇' : '🔊';
+        });
+
+        // 时间显示格式化函数
+        function updateTimeDisplay() {
+            const current = formatTime(video.currentTime);
+            const total = formatTime(video.duration);
+            timeDisplay.textContent = `${current} / ${total}`;
+        }
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        // ==================== 样式与交互增强 ====================
+        // 鼠标悬停在视频区域时，短暂显示控制条
+        let controlsTimeout;
+        video.addEventListener('mousemove', () => {
+            customControls.style.opacity = '1';
+            clearTimeout(controlsTimeout);
+            controlsTimeout = setTimeout(() => {
+                customControls.style.opacity = '0';
+            }, 2000);
+        });
+        // 初始设置控制条透明
+        customControls.style.transition = 'opacity 0.3s';
+        customControls.style.opacity = '0';
     </script>
 </body>
 
 </html>
+
 
