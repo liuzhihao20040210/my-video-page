@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>视频播放</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        body, html { height: 100%; overflow: hidden; background: #000; }
+        .video-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        video {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <!-- ！！！重要：将下一行引号内的链接替换成你的实际视频链接！！！ -->
+        <video src="https://ad8467fb466e81193a119ae724846ba4.mp4" autoplay muted playsinline controls loop></video>
+    </div>
+    <script>
+        // 尝试自动播放，并为点击全屏做准备
+        const video = document.querySelector('video');
+        video.play().catch(e => { /* 忽略自动播放被阻止的报错 */ });
+
+        // 点击视频区域切换全屏（提升体验）
+        video.addEventListener('click', function() {
+            if (!document.fullscreenElement) {
+                if (video.requestFullscreen) video.requestFullscreen();
+                else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+            }
+        });
+    </script>
+</body>
+</html>
