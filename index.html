@@ -23,77 +23,86 @@
     </style>
 </head>
 <body>
-    <div class="video-container">
-        <video id="myVideo" muted playsinline loop>
-            <!-- 重要：请确保这里的视频文件名与实际完全一致 -->
+    <!-- 针对微信的专用视频容器 -->
+    <div id="wechatContainer" style="width:100vw; height:100vh; background:#000; position:relative; overflow:hidden;">
+        <video
+            id="myVideo"
+            style="width:100%; height:100%; object-fit:contain;"
+            playsinline
+            webkit-playsinline
+            x5-playsinline
+            x5-video-player-type="h5"
+            x5-video-player-fullscreen="false"
+            preload="auto"
+            loop
+        >
+            <!-- 重要：请将 `src` 中的视频文件名修改为你实际的文件名 -->
             <source src="my_video.mp4" type="video/mp4">
-            您的浏览器不支持 HTML5 视频。
+            您的浏览器不支持视频播放。
         </video>
-        <!-- 自定义的极简控制条 -->
-        <div id="customControls" style="display: none; position: absolute; bottom: 0; width: 100%; background: rgba(0, 0, 0, 0.7); color: white; box-sizing: border-box; padding: 10px;">
-            <div style="display: flex; align-items: center;">
-                <button id="playPauseBtn" style="background: none; border: none; color: white; font-size: 20px; margin-right: 10px;">▶️</button>
-                <span id="timeDisplay" style="margin-right: 10px;">0:00 / 0:00</span>
-                <input type="range" id="progressBar" value="0" style="flex-grow: 1; margin-right: 10px;">
-                <button id="muteBtn" style="background: none; border: none; color: white; font-size: 18px;">🔇</button>
-            </div>
+
+        <!-- 微信专用引导层（覆盖整个屏幕） -->
+        <div id="wechatOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:10;">
+            <p style="font-size:18px; margin-bottom:30px;">点击下方按钮播放视频</p>
+            <button id="wechatPlayBtn" style="padding:15px 40px; font-size:20px; background:#07c160; color:white; border:none; border-radius:8px; cursor:pointer;">播放视频</button>
         </div>
-        <!-- 初始引导播放按钮（保持原有逻辑） -->
-        <div id="playOverlay" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.7); color:white; padding:20px; border-radius:10px; cursor:pointer;">
-            点击播放视频
+
+        <!-- 自定义极简控制条（播放后才显示） -->
+        <div id="customControls" style="position:absolute; bottom:10px; left:10px; right:10px; background:rgba(0,0,0,0.7); border-radius:8px; padding:12px; box-sizing:border-box; display:none; align-items:center; z-index:5; backdrop-filter: blur(5px);">
+            <button id="playPauseBtn" style="background:none; border:none; color:white; font-size:24px; margin-right:10px; padding:0;">▶️</button>
+            <span id="timeDisplay" style="color:white; font-size:14px; margin-right:10px; min-width:80px;">0:00 / 0:00</span>
+            <input type="range" id="progressBar" value="0" style="flex-grow:1; margin-right:10px; height:4px; border-radius:2px;">
+            <button id="muteBtn" style="background:none; border:none; color:white; font-size:20px; padding:0;">🔇</button>
         </div>
     </div>
 
     <script>
+        // 获取元素
         const video = document.getElementById('myVideo');
-        const playOverlay = document.getElementById('playOverlay');
+        const container = document.getElementById('wechatContainer');
+        const overlay = document.getElementById('wechatOverlay');
+        const wechatPlayBtn = document.getElementById('wechatPlayBtn');
         const customControls = document.getElementById('customControls');
         const playPauseBtn = document.getElementById('playPauseBtn');
         const progressBar = document.getElementById('progressBar');
         const timeDisplay = document.getElementById('timeDisplay');
         const muteBtn = document.getElementById('muteBtn');
 
-        // ==================== 核心策略：禁用全屏与倍速 ====================
-        // 1. 阻止任何全屏请求（彻底禁用功能）
+        // ==================== 微信环境核心配置 ====================
+        // 1. 禁用全屏与倍速（针对微信及通用浏览器）
         video.addEventListener('fullscreenchange', (e) => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            }
+            if (document.fullscreenElement) document.exitFullscreen();
         });
         video.addEventListener('webkitfullscreenchange', (e) => {
-            if (document.webkitFullscreenElement) {
-                document.webkitExitFullscreen();
-            }
+            if (document.webkitFullscreenElement) document.webkitExitFullscreen();
         });
-
-        // 2. 锁定播放速率，并防止通过任何方式修改
+        // 锁定播放速率
         video.playbackRate = 1.0;
         video.defaultPlaybackRate = 1.0;
         Object.defineProperty(video, 'playbackRate', { writable: false });
         Object.defineProperty(video, 'defaultPlaybackRate', { writable: false });
 
-        // ==================== 自动播放与引导按钮逻辑 ====================
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.log("自动播放被阻止，显示引导按钮。");
-                playOverlay.style.display = 'block';
-                customControls.style.display = 'none'; // 初始隐藏自定义控制条
-            });
-        } else {
-            // 如果自动播放成功，则显示自定义控制条
-            customControls.style.display = 'block';
-        }
-
-        playOverlay.addEventListener('click', function() {
-            video.play();
-            playOverlay.style.display = 'none';
-            customControls.style.display = 'block'; // 开始播放后显示自定义控制条
+        // 2. 微信中必须通过用户触摸事件触发播放
+        wechatPlayBtn.addEventListener('click', function() {
+            // 显示视频，隐藏引导层
+            video.style.display = 'block';
+            overlay.style.display = 'none';
+            // 尝试播放（微信中此时通常允许）
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    // 播放成功，显示自定义控制条
+                    customControls.style.display = 'flex';
+                }).catch(e => {
+                    console.log("微信播放被阻止:", e);
+                });
+            }
         });
 
         // ==================== 自定义控制条逻辑 ====================
         // 播放/暂停
-        playPauseBtn.addEventListener('click', () => {
+        playPauseBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 防止事件冒泡
             if (video.paused) {
                 video.play();
             } else {
@@ -108,59 +117,94 @@
         });
 
         // 进度条
+        let isDragging = false;
         video.addEventListener('loadedmetadata', () => {
             progressBar.max = Math.floor(video.duration);
             updateTimeDisplay();
         });
         video.addEventListener('timeupdate', () => {
-            if (!progressBar.isDragging) {
+            if (!isDragging) {
                 progressBar.value = Math.floor(video.currentTime);
                 updateTimeDisplay();
             }
         });
         progressBar.addEventListener('input', () => {
-            progressBar.isDragging = true;
+            isDragging = true;
             video.currentTime = progressBar.value;
             updateTimeDisplay();
         });
         progressBar.addEventListener('change', () => {
-            progressBar.isDragging = false;
+            isDragging = false;
         });
 
         // 静音/取消静音
-        muteBtn.addEventListener('click', () => {
+        muteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             video.muted = !video.muted;
             muteBtn.textContent = video.muted ? '🔇' : '🔊';
         });
 
-        // 时间显示格式化函数
-        function updateTimeDisplay() {
-            const current = formatTime(video.currentTime);
-            const total = formatTime(video.duration);
-            timeDisplay.textContent = `${current} / ${total}`;
-        }
+        // 时间显示格式化
         function formatTime(seconds) {
             const min = Math.floor(seconds / 60);
             const sec = Math.floor(seconds % 60);
             return `${min}:${sec.toString().padStart(2, '0')}`;
         }
+        function updateTimeDisplay() {
+            const current = formatTime(video.currentTime);
+            const total = formatTime(video.duration);
+            timeDisplay.textContent = `${current} / ${total}`;
+        }
 
-        // ==================== 样式与交互增强 ====================
-        // 鼠标悬停在视频区域时，短暂显示控制条
-        let controlsTimeout;
-        video.addEventListener('mousemove', () => {
+        // ==================== 微信中控制条显示/隐藏逻辑 ====================
+        let controlsTimer;
+        function showControls() {
             customControls.style.opacity = '1';
-            clearTimeout(controlsTimeout);
-            controlsTimeout = setTimeout(() => {
+            clearTimeout(controlsTimer);
+            controlsTimer = setTimeout(() => {
                 customControls.style.opacity = '0';
             }, 2000);
-        });
-        // 初始设置控制条透明
-        customControls.style.transition = 'opacity 0.3s';
+        }
+        // 初始隐藏控制条
+        customControls.style.transition = 'opacity 0.5s';
         customControls.style.opacity = '0';
+        // 点击视频或控制条区域时显示
+        container.addEventListener('click', (e) => {
+            if (e.target.id !== 'playPauseBtn' && e.target.id !== 'muteBtn' && e.target.id !== 'progressBar') {
+                showControls();
+            }
+        });
+        // 鼠标移动时也显示
+        container.addEventListener('mousemove', showControls);
     </script>
+
+    <!-- 针对微信的额外样式补丁 -->
+    <style>
+        /* 强制隐藏微信可能生成的默认播放控件 */
+        video::-webkit-media-controls { display:none !important; }
+        video::-webkit-media-controls-enclosure { display:none !important; }
+        /* 防止微信长按菜单 */
+        #wechatContainer {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        /* 进度条样式优化 */
+        #progressBar {
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.3);
+        }
+        #progressBar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #07c160;
+        }
+    </style>
 </body>
 
 </html>
+
 
 
